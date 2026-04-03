@@ -1,0 +1,615 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.wf-root{font-family:var(--font-sans);color:var(--color-text-primary);padding:16px 0}
+.screen-tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.screen-tab{padding:7px 14px;font-size:13px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);cursor:pointer;background:var(--color-background-primary);color:var(--color-text-secondary);transition:all .15s}
+.screen-tab.active{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info)}
+.screen{display:none}
+.screen.active{display:block}
+
+.wf-frame{border:1.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);overflow:hidden;background:var(--color-background-primary)}
+
+.topbar{height:48px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;padding:0 16px;gap:12px;background:var(--color-background-primary)}
+.topbar-logo{width:28px;height:28px;border-radius:6px;background:#534AB7;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:#EEEDFE;flex-shrink:0}
+.topbar-title{font-size:13px;font-weight:500}
+.topbar-spacer{flex:1}
+.avatar-sm{width:28px;height:28px;border-radius:50%;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-secondary)}
+.badge{padding:2px 7px;border-radius:20px;font-size:11px;font-weight:500}
+.badge-purple{background:#EEEDFE;color:#3C3489}
+.badge-teal{background:#E1F5EE;color:#085041}
+.badge-amber{background:#FAEEDA;color:#633806}
+.badge-red{background:#FCEBEB;color:#791F1F}
+.badge-gray{background:var(--color-background-secondary);color:var(--color-text-secondary)}
+
+/* ── SCREEN 1: CHAT ── */
+.chat-layout{display:grid;grid-template-columns:220px 1fr;height:560px}
+.chat-sidebar{border-right:0.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-section{padding:10px 12px;font-size:11px;font-weight:500;color:var(--color-text-tertiary);letter-spacing:.06em;border-bottom:0.5px solid var(--color-border-tertiary)}
+.session-item{padding:9px 12px;cursor:pointer;border-bottom:0.5px solid var(--color-border-tertiary);transition:background .1s}
+.session-item:hover{background:var(--color-background-secondary)}
+.session-item.active{background:var(--color-background-secondary);border-left:2px solid #534AB7}
+.session-title{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.session-meta{font-size:11px;color:var(--color-text-tertiary);margin-top:2px}
+.new-chat-btn{margin:10px 12px;padding:7px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:12px;cursor:pointer;text-align:center;color:var(--color-text-secondary);background:var(--color-background-primary);display:flex;align-items:center;gap:6px;justify-content:center}
+
+.chat-main{display:flex;flex-direction:column;overflow:hidden}
+.chat-header{padding:10px 16px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;gap:8px}
+.chat-messages{flex:1;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;background:var(--color-background-tertiary)}
+.msg{display:flex;gap:8px;align-items:flex-start;max-width:82%}
+.msg.user{align-self:flex-end;flex-direction:row-reverse}
+.msg-bubble{padding:9px 13px;border-radius:12px;font-size:13px;line-height:1.5}
+.msg-bubble.user{background:#534AB7;color:#EEEDFE;border-radius:12px 12px 2px 12px}
+.msg-bubble.ai{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:12px 12px 12px 2px;color:var(--color-text-primary)}
+.msg-avatar{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500}
+.msg-avatar.ai{background:#EEEDFE;color:#534AB7;border:0.5px solid #AFA9EC}
+.msg-avatar.user{background:#534AB7;color:#EEEDFE}
+.tool-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;background:#E1F5EE;color:#085041;margin-bottom:6px}
+.chat-input-row{padding:10px 14px;border-top:0.5px solid var(--color-border-tertiary);display:flex;gap:8px;align-items:center;background:var(--color-background-primary)}
+.chat-input{flex:1;padding:8px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:13px;background:var(--color-background-secondary);color:var(--color-text-primary)}
+.send-btn{width:34px;height:34px;border-radius:var(--border-radius-md);background:#534AB7;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+
+/* ── SCREEN 2: ADMIN DASHBOARD ── */
+.admin-layout{display:grid;grid-template-columns:200px 1fr;height:560px}
+.admin-nav{border-right:0.5px solid var(--color-border-tertiary);padding:12px 0}
+.nav-item{padding:9px 16px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:9px;color:var(--color-text-secondary);border-left:2px solid transparent}
+.nav-item.active{color:#534AB7;background:#EEEDFE;border-left-color:#534AB7;font-weight:500}
+.nav-item svg{width:15px;height:15px;flex-shrink:0;opacity:.7}
+.admin-content{overflow-y:auto;padding:20px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:20px}
+.stat-card{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px 14px}
+.stat-label{font-size:11px;color:var(--color-text-secondary);margin-bottom:4px}
+.stat-val{font-size:22px;font-weight:500}
+.stat-change{font-size:11px;color:var(--color-text-success);margin-top:3px}
+.section-hd{font-size:14px;font-weight:500;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.mini-btn{padding:5px 10px;font-size:11px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);cursor:pointer;background:var(--color-background-primary);color:var(--color-text-secondary)}
+.data-row{display:grid;font-size:12px;padding:8px 10px;border-bottom:0.5px solid var(--color-border-tertiary);align-items:center}
+.data-row:hover{background:var(--color-background-secondary)}
+.data-row-hd{font-size:11px;font-weight:500;color:var(--color-text-secondary);background:var(--color-background-secondary);padding:7px 10px}
+.chart-bar-wrap{display:flex;gap:6px;align-items:flex-end;height:80px;padding:0 0 4px;border-bottom:0.5px solid var(--color-border-tertiary);margin-bottom:12px}
+.chart-bar{flex:1;background:#AFA9EC;border-radius:3px 3px 0 0;min-height:8px;transition:opacity .2s}
+.chart-bar:hover{opacity:.75}
+.chart-bar.today{background:#534AB7}
+
+/* ── SCREEN 3: KNOWLEDGE BASE ── */
+.kb-layout{display:grid;grid-template-columns:240px 1fr;height:560px}
+.kb-sidebar{border-right:0.5px solid var(--color-border-tertiary);padding:12px}
+.kb-cat{padding:7px 10px;border-radius:var(--border-radius-md);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;color:var(--color-text-secondary)}
+.kb-cat.active{background:#EEEDFE;color:#3C3489;font-weight:500}
+.kb-cat-count{font-size:11px;background:var(--color-background-secondary);padding:1px 6px;border-radius:20px}
+.kb-main{display:flex;flex-direction:column;overflow:hidden}
+.kb-toolbar{padding:10px 16px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;gap:8px;align-items:center}
+.kb-search{flex:1;padding:7px 11px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:13px;background:var(--color-background-secondary)}
+.upload-btn{padding:7px 13px;border:0.5px solid #534AB7;border-radius:var(--border-radius-md);font-size:12px;color:#534AB7;cursor:pointer;background:transparent;white-space:nowrap}
+.doc-list{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.doc-card{padding:12px 14px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);cursor:pointer;background:var(--color-background-primary)}
+.doc-card:hover{border-color:var(--color-border-secondary);background:var(--color-background-secondary)}
+.doc-card-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px}
+.doc-icon{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0}
+.doc-icon.pdf{background:#FCEBEB;color:#A32D2D}
+.doc-icon.docx{background:#E6F1FB;color:#0C447C}
+.doc-icon.xlsx{background:#EAF3DE;color:#27500A}
+.doc-title{font-size:13px;font-weight:500;line-height:1.3}
+.doc-meta{font-size:11px;color:var(--color-text-secondary);display:flex;gap:8px;flex-wrap:wrap}
+.chunk-count{font-size:11px;color:var(--color-text-tertiary);display:flex;align-items:center;gap:4px}
+
+/* ── SCREEN 4: TASK BOARD ── */
+.task-layout{display:flex;flex-direction:column;height:560px;overflow:hidden}
+.task-toolbar{padding:10px 16px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;gap:8px;align-items:center}
+.task-board{flex:1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:14px 16px;overflow-y:auto;background:var(--color-background-tertiary)}
+.col-hd{font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.col-badge{padding:1px 7px;border-radius:20px;font-size:11px}
+.task-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:10px 12px;margin-bottom:7px;cursor:pointer}
+.task-card:hover{border-color:var(--color-border-secondary)}
+.task-card-title{font-size:12px;font-weight:500;margin-bottom:6px;line-height:1.4}
+.task-card-foot{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+.priority-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.p-high{background:#E24B4A}
+.p-med{background:#EF9F27}
+.p-low{background:#1D9E75}
+.due{font-size:11px;color:var(--color-text-tertiary)}
+.assignee{width:22px;height:22px;border-radius:50%;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:var(--color-text-secondary)}
+.add-task{border:0.5px dashed var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px;text-align:center;font-size:12px;color:var(--color-text-tertiary);cursor:pointer;margin-top:4px}
+.add-task:hover{background:var(--color-background-secondary)}
+</style>
+
+<div class="wf-root">
+<div class="screen-tabs">
+  <div class="screen-tab active" onclick="showScreen('chat',this)">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="display:inline;vertical-align:middle;margin-right:5px"><path d="M2 3h12v8H9l-3 3v-3H2z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/></svg>Chat UI
+  </div>
+  <div class="screen-tab" onclick="showScreen('admin',this)">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="display:inline;vertical-align:middle;margin-right:5px"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>Admin Dashboard
+  </div>
+  <div class="screen-tab" onclick="showScreen('kb',this)">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="display:inline;vertical-align:middle;margin-right:5px"><path d="M3 2h10v12H3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 6h4M6 9h4M6 12h2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>Knowledge Base
+  </div>
+  <div class="screen-tab" onclick="showScreen('tasks',this)">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="display:inline;vertical-align:middle;margin-right:5px"><rect x="2" y="3" width="3" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="7" y="5" width="3" height="8" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="2" width="2" height="11" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>Task Board
+  </div>
+</div>
+
+<!-- SCREEN 1: CHAT -->
+<div id="screen-chat" class="screen active">
+<div class="wf-frame">
+  <div class="topbar">
+    <div class="topbar-logo">H</div>
+    <span class="topbar-title">Hotel Digital Assistant</span>
+    <div class="topbar-spacer"></div>
+    <span class="badge badge-purple">Staff</span>
+    <div class="avatar-sm">NT</div>
+  </div>
+  <div class="chat-layout">
+    <div class="chat-sidebar">
+      <div class="new-chat-btn">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Cuộc trò chuyện mới
+      </div>
+      <div class="sidebar-section">HÔM NAY</div>
+      <div class="session-item active">
+        <div class="session-title">Chính sách hủy phòng VIP</div>
+        <div class="session-meta">14:32 · Web</div>
+      </div>
+      <div class="session-item">
+        <div class="session-title">Gói Honeymoon Suite giá?</div>
+        <div class="session-meta">11:05 · Zalo</div>
+      </div>
+      <div class="sidebar-section">HÔM QUA</div>
+      <div class="session-item">
+        <div class="session-title">Lên kế hoạch event tháng 8</div>
+        <div class="session-meta">16:20 · Web</div>
+      </div>
+      <div class="session-item">
+        <div class="session-title">Soạn email confirm booking</div>
+        <div class="session-meta">09:15 · Web</div>
+      </div>
+      <div class="session-item">
+        <div class="session-title">Nhắc họp weekly 9h thứ 2</div>
+        <div class="session-meta">08:50 · Zalo</div>
+      </div>
+    </div>
+    <div class="chat-main">
+      <div class="chat-header">
+        <div style="font-size:13px;font-weight:500">Chính sách hủy phòng VIP</div>
+        <div style="flex:1"></div>
+        <span class="badge badge-teal" style="font-size:11px">Knowledge Base</span>
+      </div>
+      <div class="chat-messages">
+        <div class="msg user">
+          <div class="msg-avatar user">NT</div>
+          <div class="msg-bubble user">Chính sách hủy phòng dành cho khách VIP là gì? Phí hủy trong vòng 24h?</div>
+        </div>
+        <div class="msg">
+          <div class="msg-avatar ai">AI</div>
+          <div>
+            <div class="tool-chip">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              Đang tra cứu · Chính sách VIP.pdf
+            </div>
+            <div class="msg-bubble ai">Theo chính sách VIP cập nhật tháng 6/2025:<br><br>• Hủy <strong>trước 48h</strong>: Hoàn 100% không mất phí<br>• Hủy <strong>24–48h</strong>: Hoàn 50% tiền phòng<br>• Hủy <strong>trong 24h</strong>: Không hoàn tiền, có thể đổi ngày 1 lần<br><br>Khách VIP Platinum được miễn phí hủy không giới hạn.</div>
+          </div>
+        </div>
+        <div class="msg user">
+          <div class="msg-avatar user">NT</div>
+          <div class="msg-bubble user">Tạo task nhắc tôi gửi email confirm cho Ms. Linh lúc 15h hôm nay</div>
+        </div>
+        <div class="msg">
+          <div class="msg-avatar ai">AI</div>
+          <div>
+            <div class="tool-chip">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M8 3l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Đã tạo reminder · 15:00 hôm nay
+            </div>
+            <div class="msg-bubble ai">Đã đặt nhắc lịch lúc <strong>15:00</strong> hôm nay. Bạn sẽ nhận thông báo qua Web và Zalo. Muốn tôi soạn sẵn nội dung email cho Ms. Linh không?</div>
+          </div>
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <div style="font-size:18px;color:var(--color-text-tertiary);cursor:pointer">+</div>
+        <input class="chat-input" placeholder="Hỏi bất cứ điều gì hoặc giao việc cho trợ lý...">
+        <div class="send-btn">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 8l12-6-6 12V8H2z" fill="#EEEDFE"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- SCREEN 2: ADMIN DASHBOARD -->
+<div id="screen-admin" class="screen">
+<div class="wf-frame">
+  <div class="topbar">
+    <div class="topbar-logo">H</div>
+    <span class="topbar-title">Admin Panel</span>
+    <div class="topbar-spacer"></div>
+    <span class="badge badge-red">Admin</span>
+    <div class="avatar-sm">TM</div>
+  </div>
+  <div class="admin-layout">
+    <div class="admin-nav">
+      <div class="nav-item active">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+        Tổng quan
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h10v12H3z" stroke-linejoin="round"/><path d="M6 6h4M6 9h4" stroke-linecap="round"/></svg>
+        Tài liệu
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke-linecap="round"/></svg>
+        Người dùng
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 11L6 7l3 3 5-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Thống kê
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v3m0 4v3M3 8h3m4 0h3" stroke-linecap="round"/><circle cx="8" cy="8" r="6"/></svg>
+        Audit Log
+      </div>
+      <div class="nav-item">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.3 3.3l1.4 1.4M11.3 11.3l1.4 1.4M3.3 12.7l1.4-1.4M11.3 4.7l1.4-1.4" stroke-linecap="round"/></svg>
+        Cài đặt
+      </div>
+    </div>
+    <div class="admin-content">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Tin nhắn hôm nay</div>
+          <div class="stat-val">247</div>
+          <div class="stat-change">+18% so hôm qua</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Token đã dùng</div>
+          <div class="stat-val">124K</div>
+          <div class="stat-change" style="color:var(--color-text-secondary)">~$0.31</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Người dùng active</div>
+          <div class="stat-val">9</div>
+          <div class="stat-change">10 tổng cộng</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Tài liệu KB</div>
+          <div class="stat-val">48</div>
+          <div class="stat-change">3 thêm tuần này</div>
+        </div>
+      </div>
+
+      <div class="section-hd">
+        Tin nhắn 7 ngày qua
+        <span class="mini-btn">Xem chi tiết</span>
+      </div>
+      <div class="chart-bar-wrap">
+        <div class="chart-bar" style="height:45%"></div>
+        <div class="chart-bar" style="height:60%"></div>
+        <div class="chart-bar" style="height:52%"></div>
+        <div class="chart-bar" style="height:80%"></div>
+        <div class="chart-bar" style="height:65%"></div>
+        <div class="chart-bar" style="height:90%"></div>
+        <div class="chart-bar today" style="height:100%"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--color-text-tertiary);margin-bottom:16px">
+        <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span style="color:#534AB7;font-weight:500">Hôm nay</span>
+      </div>
+
+      <div class="section-hd">
+        Hoạt động gần đây
+        <span class="mini-btn">Xem tất cả</span>
+      </div>
+      <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);overflow:hidden">
+        <div class="data-row data-row-hd" style="grid-template-columns:1fr 100px 80px 90px">
+          <span>Người dùng</span><span>Hành động</span><span>Kênh</span><span>Thời gian</span>
+        </div>
+        <div class="data-row" style="grid-template-columns:1fr 100px 80px 90px">
+          <span style="font-size:12px">Nguyễn Thảo</span>
+          <span><span class="badge badge-purple">query</span></span>
+          <span style="font-size:12px">Web</span>
+          <span style="font-size:11px;color:var(--color-text-tertiary)">14:32</span>
+        </div>
+        <div class="data-row" style="grid-template-columns:1fr 100px 80px 90px">
+          <span style="font-size:12px">Trần Minh</span>
+          <span><span class="badge badge-teal">doc_upload</span></span>
+          <span style="font-size:12px">Web</span>
+          <span style="font-size:11px;color:var(--color-text-tertiary)">13:15</span>
+        </div>
+        <div class="data-row" style="grid-template-columns:1fr 100px 80px 90px">
+          <span style="font-size:12px">Lê Hương</span>
+          <span><span class="badge badge-amber">task_create</span></span>
+          <span style="font-size:12px">Zalo</span>
+          <span style="font-size:11px;color:var(--color-text-tertiary)">11:48</span>
+        </div>
+        <div class="data-row" style="grid-template-columns:1fr 100px 80px 90px">
+          <span style="font-size:12px">Phạm Đức</span>
+          <span><span class="badge badge-purple">query</span></span>
+          <span style="font-size:12px">WhatsApp</span>
+          <span style="font-size:11px;color:var(--color-text-tertiary)">10:02</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- SCREEN 3: KNOWLEDGE BASE -->
+<div id="screen-kb" class="screen">
+<div class="wf-frame">
+  <div class="topbar">
+    <div class="topbar-logo">H</div>
+    <span class="topbar-title">Knowledge Base</span>
+    <div class="topbar-spacer"></div>
+    <span class="badge badge-purple">Manager</span>
+    <div class="avatar-sm">LH</div>
+  </div>
+  <div class="kb-layout">
+    <div class="kb-sidebar">
+      <div style="font-size:11px;font-weight:500;color:var(--color-text-tertiary);padding:0 4px 8px;letter-spacing:.06em">DANH MỤC</div>
+      <div class="kb-cat active">
+        Tất cả
+        <span class="kb-cat-count">48</span>
+      </div>
+      <div class="kb-cat">
+        Chính sách
+        <span class="kb-cat-count">12</span>
+      </div>
+      <div class="kb-cat">
+        Gói phòng
+        <span class="kb-cat-count">8</span>
+      </div>
+      <div class="kb-cat">
+        Quy trình SOP
+        <span class="kb-cat-count">15</span>
+      </div>
+      <div class="kb-cat">
+        FAQ khách hàng
+        <span class="kb-cat-count">9</span>
+      </div>
+      <div class="kb-cat">
+        Khác
+        <span class="kb-cat-count">4</span>
+      </div>
+      <div style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--color-border-tertiary)">
+        <div style="font-size:11px;color:var(--color-text-secondary);margin-bottom:6px">Dung lượng</div>
+        <div style="height:5px;background:var(--color-background-secondary);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:34%;background:#534AB7;border-radius:3px"></div>
+        </div>
+        <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px">3.4 GB / 10 GB</div>
+      </div>
+    </div>
+    <div class="kb-main">
+      <div class="kb-toolbar">
+        <input class="kb-search" placeholder="Tìm kiếm ngữ nghĩa trong tài liệu...">
+        <button class="upload-btn">+ Upload tài liệu</button>
+      </div>
+      <div class="doc-list">
+        <div class="doc-card">
+          <div class="doc-card-top">
+            <div class="doc-icon pdf">PDF</div>
+            <div style="flex:1">
+              <div class="doc-title">Chính sách hủy phòng VIP 2025</div>
+              <div class="doc-meta">
+                <span class="badge badge-purple">Chính sách</span>
+                <span class="badge badge-gray">Staff+</span>
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--color-text-tertiary)">Hôm nay</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="chunk-count">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="7" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="2" y="12" width="8" height="3" rx="1" stroke="currentColor" stroke-width="1.2"/></svg>
+              24 chunks · 2.1MB
+            </div>
+            <span style="font-size:11px;color:var(--color-text-success)">Đã embed</span>
+          </div>
+        </div>
+        <div class="doc-card">
+          <div class="doc-card-top">
+            <div class="doc-icon docx">DOC</div>
+            <div style="flex:1">
+              <div class="doc-title">Bảng giá gói phòng Honeymoon Suite Q3/2025</div>
+              <div class="doc-meta">
+                <span class="badge badge-amber">Gói phòng</span>
+                <span class="badge badge-red">Manager+</span>
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--color-text-tertiary)">15/07</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="chunk-count">18 chunks · 1.4MB</div>
+            <span style="font-size:11px;color:var(--color-text-success)">Đã embed</span>
+          </div>
+        </div>
+        <div class="doc-card">
+          <div class="doc-card-top">
+            <div class="doc-icon xlsx">XLS</div>
+            <div style="flex:1">
+              <div class="doc-title">SOP Check-in / Check-out tiêu chuẩn 5 sao</div>
+              <div class="doc-meta">
+                <span class="badge badge-teal">Quy trình</span>
+                <span class="badge badge-gray">Staff+</span>
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--color-text-tertiary)">10/07</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="chunk-count">36 chunks · 3.8MB</div>
+            <span style="font-size:11px;color:var(--color-text-success)">Đã embed</span>
+          </div>
+        </div>
+        <div class="doc-card" style="border-color:var(--color-border-warning);background:var(--color-background-warning)">
+          <div class="doc-card-top">
+            <div class="doc-icon pdf">PDF</div>
+            <div style="flex:1">
+              <div class="doc-title">Quy định an toàn PCCC khách sạn</div>
+              <div class="doc-meta">
+                <span class="badge badge-gray">Khác</span>
+                <span class="badge badge-gray">Admin</span>
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--color-text-tertiary)">05/07</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="chunk-count">12 chunks · 0.9MB</div>
+            <span style="font-size:11px;color:var(--color-text-warning)">Đang xử lý...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- SCREEN 4: TASK BOARD -->
+<div id="screen-tasks" class="screen">
+<div class="wf-frame">
+  <div class="topbar">
+    <div class="topbar-logo">H</div>
+    <span class="topbar-title">Task Board</span>
+    <div class="topbar-spacer"></div>
+    <div style="display:flex;gap:4px">
+      <div class="assignee">NT</div>
+      <div class="assignee">LH</div>
+      <div class="assignee">TM</div>
+    </div>
+    <span class="badge badge-purple">Manager</span>
+  </div>
+  <div class="task-layout">
+    <div class="task-toolbar">
+      <select style="font-size:12px;padding:5px 8px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)">
+        <option>Tất cả dự án</option>
+        <option>Marketing T8</option>
+        <option>OTA Campaign</option>
+      </select>
+      <select style="font-size:12px;padding:5px 8px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)">
+        <option>Tất cả thành viên</option>
+      </select>
+      <div style="flex:1"></div>
+      <button style="padding:6px 12px;font-size:12px;border:0.5px solid #534AB7;color:#534AB7;background:transparent;border-radius:var(--border-radius-md);cursor:pointer">+ Thêm task</button>
+    </div>
+    <div class="task-board">
+      <div>
+        <div class="col-hd">
+          Todo
+          <span class="col-badge badge-gray">4</span>
+        </div>
+        <div class="task-card">
+          <div class="task-card-title">Cập nhật bảng giá phòng Q4 lên system</div>
+          <div class="doc-meta" style="margin-bottom:4px"><span class="badge badge-amber">OTA Campaign</span></div>
+          <div class="task-card-foot">
+            <div style="display:flex;align-items:center;gap:5px">
+              <div class="priority-dot p-high"></div>
+              <span style="font-size:11px;color:var(--color-text-secondary)">Cao</span>
+            </div>
+            <span class="due">31/07</span>
+            <div class="assignee">LH</div>
+          </div>
+        </div>
+        <div class="task-card">
+          <div class="task-card-title">Thiết kế banner chạy quảng cáo Facebook</div>
+          <div class="doc-meta" style="margin-bottom:4px"><span class="badge badge-purple">Marketing T8</span></div>
+          <div class="task-card-foot">
+            <div style="display:flex;align-items:center;gap:5px">
+              <div class="priority-dot p-med"></div>
+              <span style="font-size:11px;color:var(--color-text-secondary)">Trung bình</span>
+            </div>
+            <span class="due">05/08</span>
+            <div class="assignee">NT</div>
+          </div>
+        </div>
+        <div class="add-task">+ Thêm task</div>
+      </div>
+      <div>
+        <div class="col-hd">
+          Đang làm
+          <span class="col-badge badge-purple">3</span>
+        </div>
+        <div class="task-card" style="border-left:2px solid #534AB7">
+          <div class="task-card-title">Viết content mô tả gói Honeymoon Suite mới</div>
+          <div class="doc-meta" style="margin-bottom:4px"><span class="badge badge-amber">OTA Campaign</span></div>
+          <div class="task-card-foot">
+            <div style="display:flex;align-items:center;gap:5px">
+              <div class="priority-dot p-high"></div>
+              <span style="font-size:11px;color:var(--color-text-secondary)">Cao</span>
+            </div>
+            <span class="due">28/07</span>
+            <div class="assignee">TM</div>
+          </div>
+        </div>
+        <div class="task-card">
+          <div class="task-card-title">Setup chatbot kết nối Zalo OA khách sạn</div>
+          <div class="doc-meta" style="margin-bottom:4px"><span class="badge badge-teal">IT Project</span></div>
+          <div class="task-card-foot">
+            <div style="display:flex;align-items:center;gap:5px">
+              <div class="priority-dot p-high"></div>
+              <span style="font-size:11px;color:var(--color-text-secondary)">Urgent</span>
+            </div>
+            <span class="due">30/07</span>
+            <div class="assignee">LH</div>
+          </div>
+        </div>
+        <div class="add-task">+ Thêm task</div>
+      </div>
+      <div>
+        <div class="col-hd">
+          Đang review
+          <span class="col-badge badge-amber">2</span>
+        </div>
+        <div class="task-card">
+          <div class="task-card-title">Kiểm tra lại quy trình check-in online</div>
+          <div class="doc-meta" style="margin-bottom:4px"><span class="badge badge-gray">Operations</span></div>
+          <div class="task-card-foot">
+            <div style="display:flex;align-items:center;gap:5px">
+              <div class="priority-dot p-med"></div>
+              <span style="font-size:11px;color:var(--color-text-secondary)">Trung bình</span>
+            </div>
+            <span class="due">26/07</span>
+            <div class="assignee">NT</div>
+          </div>
+        </div>
+        <div class="add-task">+ Thêm task</div>
+      </div>
+      <div>
+        <div class="col-hd">
+          Hoàn thành
+          <span class="col-badge badge-teal">6</span>
+        </div>
+        <div class="task-card" style="opacity:.6">
+          <div class="task-card-title" style="text-decoration:line-through">Upload chính sách VIP mới lên KB</div>
+          <div class="doc-meta" style="margin-bottom:4px"><span class="badge badge-gray">IT Project</span></div>
+          <div class="task-card-foot">
+            <div style="display:flex;align-items:center;gap:5px">
+              <div class="priority-dot p-low"></div>
+              <span style="font-size:11px;color:var(--color-text-secondary)">Thấp</span>
+            </div>
+            <span class="due">25/07</span>
+            <div class="assignee">TM</div>
+          </div>
+        </div>
+        <div class="task-card" style="opacity:.6">
+          <div class="task-card-title" style="text-decoration:line-through">Họp kickoff dự án chatbot</div>
+          <div class="doc-meta" style="margin-bottom:4px"><span class="badge badge-gray">IT Project</span></div>
+          <div class="task-card-foot">
+            <div style="display:flex;align-items:center;gap:5px">
+              <div class="priority-dot p-high"></div>
+              <span style="font-size:11px;color:var(--color-text-secondary)">Cao</span>
+            </div>
+            <span class="due">20/07</span>
+            <div class="assignee">NT</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<script>
+function showScreen(id, tab) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.screen-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  tab.classList.add('active');
+}
+</script>
