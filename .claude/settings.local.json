@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(PGPASSWORD=\"Satthuskt321@\" psql -h 27.71.229.4 -p 6243 -U postgres -d hotelchat -f \"00_extensions.sql\")"
+    ]
+  }
+}

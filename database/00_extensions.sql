@@ -5,5 +5,5 @@
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";   -- UUID generation
-CREATE EXTENSION IF NOT EXISTS "pgvector";    -- Vector similarity search
+CREATE EXTENSION IF NOT EXISTS "vector";      -- Vector similarity search
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";    -- AES-256 encryption
