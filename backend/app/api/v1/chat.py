@@ -7,6 +7,7 @@ Chat endpoints:
 from __future__ import annotations
 
 import json
+import logging
 import time
 import uuid
 from datetime import datetime, timezone
@@ -16,6 +17,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.core.database import get_db
 from app.core.deps import CurrentUser
@@ -79,9 +82,13 @@ async def _sse_generator(
 ) -> AsyncGenerator[str, None]:
     """Toàn bộ pipeline: RAG → build prompt → stream → guard → save."""
 
-    # 1. RAG search
+    # 1. RAG search (bọc try/except để embedding lỗi không crash toàn bộ)
     allowed_levels = ROLES_ACCESS.get(user.role, ["public", "staff"])
-    rag_chunks = await rag_search(db, user_message, allowed_levels)
+    try:
+        rag_chunks = await rag_search(db, user_message, allowed_levels)
+    except Exception as e:
+        logger.warning(f"RAG search failed, continuing without context: {e}")
+        rag_chunks = []
 
     # 2. System prompt
     system_prompt = build_system_prompt(
@@ -92,7 +99,11 @@ async def _sse_generator(
     )
 
     # 3. Context window (summarize nếu cần)
-    context_window = await maybe_summarize(list(session.context_window or []))
+    try:
+        context_window = await maybe_summarize(list(session.context_window or []))
+    except Exception as e:
+        logger.warning(f"Summarize failed, using raw context: {e}")
+        context_window = list(session.context_window or [])
 
     # 4. Route model
     model = route_model(user_message)
@@ -102,12 +113,14 @@ async def _sse_generator(
         sources = [{"title": c["title"], "score": round(c["score"], 3)} for c in rag_chunks]
         yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
 
-    # 5. Stream từ Anthropic
+    # 5. Stream từ Ollama
     start_ms = time.monotonic()
     full_text = ""
     input_tokens = 0
     output_tokens = 0
     blocked = False
+
+    logger.info(f"[CHAT] user={user.email} model={model} message={user_message!r}")
 
     async for event_type, data in stream_chat(system_prompt, context_window, user_message, model, db=db, user=user):
         if event_type == "token":
@@ -120,9 +133,11 @@ async def _sse_generator(
             yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
 
         elif event_type == "tool_call":
+            logger.info(f"[TOOL] calling: {data}")
             yield f"data: {json.dumps({'type': 'tool_call', 'tool': data})}\n\n"
 
         elif event_type == "tool_result":
+            logger.info(f"[TOOL] result: {data[:200]}")
             yield f"data: {json.dumps({'type': 'tool_result', 'result': data})}\n\n"
 
         elif event_type == "done":
@@ -134,8 +149,11 @@ async def _sse_generator(
                 pass
 
         elif event_type == "error":
+            logger.error(f"[CHAT ERROR] {data}")
             yield f"data: {json.dumps({'type': 'error', 'message': data})}\n\n"
             return
+
+    logger.info(f"[CHAT] response ({len(full_text)} chars, {input_tokens}+{output_tokens} tokens): {full_text[:300]!r}")
 
     if blocked:
         return
@@ -192,6 +210,7 @@ async def chat_message(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Gửi message, nhận SSE stream (token-by-token)."""
+    print(f"[CHAT ENDPOINT HIT] user={current_user.email} msg={body.message!r}", flush=True)
     if not body.message.strip():
         raise HTTPException(400, "Message không được rỗng")
 

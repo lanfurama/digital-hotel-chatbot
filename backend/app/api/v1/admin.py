@@ -113,9 +113,9 @@ async def cost_estimate(
             Message.role == "assistant",
         )
     )
-    row = result.one()
-    total_tokens = int(row.total_tokens or 0)
-    total_messages = int(row.total_messages or 0)
+    row = result.first()
+    total_tokens = int(row.total_tokens or 0) if row else 0
+    total_messages = int(row.total_messages or 0) if row else 0
 
     # Giá tham khảo (USD per 1M tokens, tháng 4/2025)
     HAIKU_PRICE = 0.80   # $0.80/1M output tokens

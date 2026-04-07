@@ -65,7 +65,7 @@ services:
     container_name: hotelchat_next
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+      BACKEND_URL: http://app:8000/api
     volumes:
       - ./frontend:/app
       - /app/node_modules

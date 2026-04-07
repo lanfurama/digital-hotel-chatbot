@@ -75,6 +75,5 @@ def setup_logging(app_env: str = "development", log_dir: str = "logs") -> None:
         root.addHandler(handler)
 
     # Giảm noise từ thư viện
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)

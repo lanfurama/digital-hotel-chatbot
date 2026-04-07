@@ -130,6 +130,20 @@ TOOL_DEFINITIONS = [
 ]
 
 
+# Ollama/OpenAI format (convert từ TOOL_DEFINITIONS ở trên)
+TOOL_DEFINITIONS_OLLAMA = [
+    {
+        "type": "function",
+        "function": {
+            "name": t["name"],
+            "description": t["description"],
+            "parameters": t["input_schema"],
+        },
+    }
+    for t in TOOL_DEFINITIONS
+]
+
+
 # ---------------------------------------------------------------------------
 # Tool executors
 # ---------------------------------------------------------------------------

@@ -141,13 +141,13 @@ async def rag_search(
             kd.title,
             kd.category,
             kd.source_url,
-            1 - (dc.embedding <=> :vec::vector) AS score
+            1 - (dc.embedding <=> CAST(:vec AS vector)) AS score
         FROM doc_chunks dc
         JOIN knowledge_docs kd ON dc.doc_id = kd.id
         WHERE kd.is_active = TRUE
           AND kd.access_level = ANY(:roles)
-          AND (:client_id IS NULL OR kd.client_id = :client_id OR kd.client_id IS NULL)
-        ORDER BY dc.embedding <=> :vec::vector
+          AND (CAST(:client_id AS uuid) IS NULL OR kd.client_id = CAST(:client_id AS uuid) OR kd.client_id IS NULL)
+        ORDER BY dc.embedding <=> CAST(:vec AS vector)
         LIMIT :limit
     """)
 
@@ -156,7 +156,7 @@ async def rag_search(
         {
             "vec": vec_str,
             "roles": user_roles,
-            "client_id": str(client_id) if client_id else None,
+            "client_id": str(client_id) if client_id else None,  # cast trong SQL
             "limit": limit,
         },
     )

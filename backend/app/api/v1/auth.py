@@ -132,7 +132,11 @@ async def refresh_token(
     if not user_id:
         raise HTTPException(status_code=401, detail="Refresh token không hợp lệ")
 
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+    try:
+        user_uuid = uuid.UUID(user_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=401, detail="Refresh token không hợp lệ")
+    result = await db.execute(select(User).where(User.id == user_uuid))
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Người dùng không hợp lệ")

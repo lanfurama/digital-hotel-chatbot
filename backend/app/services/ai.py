@@ -1,21 +1,17 @@
 """
-AI Service: system prompt builder, model router, Anthropic streaming.
-Không dùng LangChain — gọi Anthropic SDK trực tiếp.
+AI Service: system prompt builder, model router, streaming.
+Provider được chọn qua AI_PROVIDER trong .env: "anthropic" | "ollama"
 """
 from __future__ import annotations
 
+import json
 import re
 from typing import AsyncGenerator
 
 import anthropic
+import httpx
 
 from app.core.config import settings
-
-# ---------------------------------------------------------------------------
-# Models
-# ---------------------------------------------------------------------------
-HAIKU_MODEL = "claude-haiku-4-5-20251001"
-SONNET_MODEL = "claude-sonnet-4-6"
 
 # ---------------------------------------------------------------------------
 # System prompt
@@ -67,9 +63,9 @@ def build_system_prompt(
 
 
 # ---------------------------------------------------------------------------
-# Model router: Haiku cho câu đơn giản, Sonnet cho phân tích phức tạp
+# Model router
 # ---------------------------------------------------------------------------
-_SONNET_KEYWORDS = re.compile(
+_COMPLEX_KEYWORDS = re.compile(
     r"lập kế hoạch|phân tích|tổng hợp|báo cáo|chiến lược|"
     r"so sánh|đánh giá|thiết kế|đề xuất|viết email|soạn thảo",
     re.IGNORECASE,
@@ -77,9 +73,10 @@ _SONNET_KEYWORDS = re.compile(
 
 
 def route_model(user_message: str) -> str:
-    if len(user_message) > 300 or _SONNET_KEYWORDS.search(user_message):
-        return SONNET_MODEL
-    return HAIKU_MODEL
+    is_complex = len(user_message) > 300 or bool(_COMPLEX_KEYWORDS.search(user_message))
+    if settings.AI_PROVIDER == "anthropic":
+        return settings.ANTHROPIC_SMART_MODEL if is_complex else settings.ANTHROPIC_FAST_MODEL
+    return settings.OLLAMA_SMART_MODEL if is_complex else settings.OLLAMA_FAST_MODEL
 
 
 # ---------------------------------------------------------------------------
@@ -90,9 +87,8 @@ MAX_CONTEXT_MESSAGES = 20
 
 async def maybe_summarize(
     context_window: list[dict],
-    model: str = HAIKU_MODEL,
+    model: str | None = None,
 ) -> list[dict]:
-    """Nếu context > MAX, summarize nửa đầu bằng Haiku và giữ nửa sau."""
     if len(context_window) <= MAX_CONTEXT_MESSAGES:
         return context_window
 
@@ -100,27 +96,78 @@ async def maybe_summarize(
     old_messages = context_window[:half]
     recent_messages = context_window[half:]
 
-    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
     summary_prompt = (
         "Tóm tắt ngắn gọn (5-10 câu) cuộc hội thoại sau, giữ lại các thông tin quan trọng:\n\n"
         + "\n".join(f"{m['role']}: {m['content']}" for m in old_messages)
     )
-    response = await client.messages.create(
-        model=HAIKU_MODEL,
-        max_tokens=512,
-        messages=[{"role": "user", "content": summary_prompt}],
-    )
-    summary_text = response.content[0].text
 
-    summary_msg = {
-        "role": "assistant",
-        "content": f"[Tóm tắt hội thoại trước]\n{summary_text}",
-    }
-    return [summary_msg] + recent_messages
+    if settings.AI_PROVIDER == "anthropic":
+        _model = model or settings.ANTHROPIC_FAST_MODEL
+        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        response = await client.messages.create(
+            model=_model,
+            max_tokens=512,
+            messages=[{"role": "user", "content": summary_prompt}],
+        )
+        summary_text = response.content[0].text
+    else:
+        _model = model or settings.OLLAMA_FAST_MODEL
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                f"{settings.OLLAMA_BASE_URL}/api/chat",
+                json={
+                    "model": _model,
+                    "messages": [{"role": "user", "content": summary_prompt}],
+                    "stream": False,
+                },
+            )
+            resp.raise_for_status()
+            summary_text = resp.json()["message"]["content"]
+
+    return [
+        {"role": "assistant", "content": f"[Tóm tắt hội thoại trước]\n{summary_text}"}
+    ] + recent_messages
 
 
 # ---------------------------------------------------------------------------
-# Streaming generator (with tool support)
+# Non-streaming (dùng cho Zalo, WhatsApp, v.v.)
+# ---------------------------------------------------------------------------
+async def chat_once(
+    system_prompt: str,
+    messages: list[dict],
+    model: str | None = None,
+    max_tokens: int = 1024,
+) -> str:
+    if settings.AI_PROVIDER == "anthropic":
+        _model = model or settings.ANTHROPIC_FAST_MODEL
+        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        response = await client.messages.create(
+            model=_model,
+            max_tokens=max_tokens,
+            system=system_prompt,
+            messages=messages,
+        )
+        return response.content[0].text
+    else:
+        _model = model or settings.OLLAMA_FAST_MODEL
+        all_messages = [{"role": "system", "content": system_prompt}] + messages
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(
+                f"{settings.OLLAMA_BASE_URL}/api/chat",
+                json={
+                    "model": _model,
+                    "messages": all_messages,
+                    "stream": False,
+                    "keep_alive": "10m",
+                    "options": {"num_predict": max_tokens},
+                },
+            )
+            resp.raise_for_status()
+            return resp.json()["message"]["content"]
+
+
+# ---------------------------------------------------------------------------
+# Streaming generator
 # ---------------------------------------------------------------------------
 async def stream_chat(
     system_prompt: str,
@@ -132,114 +179,198 @@ async def stream_chat(
 ) -> AsyncGenerator[tuple[str, str], None]:
     """
     Yield (event_type, data) tuples:
-      - ("tool_call", tool_name)       ← Claude đang gọi tool
-      - ("tool_result", result_text)   ← kết quả tool
+      - ("tool_call", tool_name)
+      - ("tool_result", result_text)
       - ("token", "...text...")
       - ("done", json_str)
       - ("error", "...message...")
     """
+    if settings.AI_PROVIDER == "anthropic":
+        async for event in _stream_anthropic(system_prompt, context_window, user_message, model, db, user):
+            yield event
+    else:
+        async for event in _stream_ollama(system_prompt, context_window, user_message, model, db, user):
+            yield event
+
+
+# ---------------------------------------------------------------------------
+# Anthropic streaming
+# ---------------------------------------------------------------------------
+async def _stream_anthropic(
+    system_prompt: str,
+    context_window: list[dict],
+    user_message: str,
+    model: str,
+    db=None,
+    user=None,
+) -> AsyncGenerator[tuple[str, str], None]:
     from app.services.tools import TOOL_DEFINITIONS, execute_tool
 
-    anthropic_client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-    messages: list[dict] = list(context_window) + [{"role": "user", "content": user_message}]
+    messages: list[dict] = list(context_window) + [
+        {"role": "user", "content": user_message}
+    ]
+    total_input_tokens = 0
+    total_output_tokens = 0
 
+    client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+
+    try:
+        for _ in range(5):
+            kwargs: dict = {
+                "model": model,
+                "max_tokens": 4096,
+                "system": system_prompt,
+                "messages": messages,
+            }
+            if db and user:
+                kwargs["tools"] = TOOL_DEFINITIONS
+
+            tool_uses: list = []
+            full_text = ""
+
+            async with client.messages.stream(**kwargs) as stream:
+                async for text in stream.text_stream:
+                    full_text += text
+                    yield ("token", text)
+
+                final_msg = await stream.get_final_message()
+                total_input_tokens += final_msg.usage.input_tokens
+                total_output_tokens += final_msg.usage.output_tokens
+
+                for block in final_msg.content:
+                    if block.type == "tool_use":
+                        tool_uses.append(block)
+
+            if not tool_uses:
+                break
+
+            assistant_content: list = []
+            if full_text:
+                assistant_content.append({"type": "text", "text": full_text})
+            for tu in tool_uses:
+                assistant_content.append({
+                    "type": "tool_use",
+                    "id": tu.id,
+                    "name": tu.name,
+                    "input": tu.input,
+                })
+            messages.append({"role": "assistant", "content": assistant_content})
+
+            tool_results: list = []
+            for tu in tool_uses:
+                yield ("tool_call", tu.name)
+                result_text = await execute_tool(tu.name, tu.input, db, user)
+                yield ("tool_result", result_text)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tu.id,
+                    "content": result_text,
+                })
+            messages.append({"role": "user", "content": tool_results})
+
+        yield (
+            "done",
+            json.dumps({
+                "model": model,
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+            }),
+        )
+
+    except Exception as e:
+        yield ("error", str(e))
+
+
+# ---------------------------------------------------------------------------
+# Ollama streaming
+# ---------------------------------------------------------------------------
+async def _stream_ollama(
+    system_prompt: str,
+    context_window: list[dict],
+    user_message: str,
+    model: str,
+    db=None,
+    user=None,
+) -> AsyncGenerator[tuple[str, str], None]:
+    from app.services.tools import TOOL_DEFINITIONS_OLLAMA, execute_tool
+
+    messages: list[dict] = (
+        [{"role": "system", "content": system_prompt}]
+        + list(context_window)
+        + [{"role": "user", "content": user_message}]
+    )
     total_input_tokens = 0
     total_output_tokens = 0
 
     try:
-        # Vòng lặp: có thể gọi tool nhiều lần trước khi có câu trả lời cuối
-        for _ in range(5):  # tối đa 5 lần tool call để tránh loop vô hạn
-            # Stream lần này
+        for _ in range(5):
+            request_body: dict = {
+                "model": model,
+                "messages": messages,
+                "stream": True,
+                "keep_alive": "10m",
+            }
+            if db and user:
+                request_body["tools"] = TOOL_DEFINITIONS_OLLAMA
+
             full_text = ""
-            input_tokens = 0
-            output_tokens = 0
-            tool_uses: list[dict] = []
-            stop_reason = "end_turn"
+            tool_calls: list[dict] = []
 
-            async with anthropic_client.messages.stream(
-                model=model,
-                max_tokens=2048,
-                system=system_prompt,
-                tools=TOOL_DEFINITIONS if db and user else [],
-                messages=messages,
-            ) as stream:
-                async for event in stream:
-                    if not hasattr(event, "type"):
-                        continue
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                async with client.stream(
+                    "POST",
+                    f"{settings.OLLAMA_BASE_URL}/api/chat",
+                    json=request_body,
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        try:
+                            chunk = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
 
-                    if event.type == "content_block_start":
-                        if hasattr(event, "content_block") and event.content_block.type == "tool_use":
-                            tool_uses.append({
-                                "id": event.content_block.id,
-                                "name": event.content_block.name,
-                                "input": {},
-                            })
-                            yield ("tool_call", event.content_block.name)
+                        msg = chunk.get("message", {})
+                        content = msg.get("content", "")
 
-                    elif event.type == "content_block_delta":
-                        delta = event.delta
-                        if hasattr(delta, "text"):
-                            full_text += delta.text
-                            yield ("token", delta.text)
-                        elif hasattr(delta, "partial_json") and tool_uses:
-                            # Accumulate tool input JSON
-                            tool_uses[-1]["_raw"] = tool_uses[-1].get("_raw", "") + delta.partial_json
+                        if content:
+                            full_text += content
+                            yield ("token", content)
 
-                    elif event.type == "message_delta":
-                        if hasattr(event, "usage"):
-                            output_tokens = event.usage.output_tokens
-                        if hasattr(event, "delta") and hasattr(event.delta, "stop_reason"):
-                            stop_reason = event.delta.stop_reason or "end_turn"
+                        if chunk.get("done"):
+                            tool_calls = msg.get("tool_calls") or []
+                            total_input_tokens += chunk.get("prompt_eval_count", 0)
+                            total_output_tokens += chunk.get("eval_count", 0)
 
-                    elif event.type == "message_start":
-                        if hasattr(event, "message") and hasattr(event.message, "usage"):
-                            input_tokens = event.message.usage.input_tokens
-
-            total_input_tokens += input_tokens
-            total_output_tokens += output_tokens
-
-            if stop_reason != "tool_use" or not tool_uses or not db or not user:
-                # Không có tool call → xong
+            if not tool_calls or not db or not user:
                 break
 
-            # Parse tool inputs và thực thi
-            import json as _json
-            assistant_content = []
-            if full_text:
-                assistant_content.append({"type": "text", "text": full_text})
+            messages.append({
+                "role": "assistant",
+                "content": full_text,
+                "tool_calls": tool_calls,
+            })
 
-            tool_results_content = []
-            for tu in tool_uses:
-                raw = tu.get("_raw", "{}")
-                try:
-                    tu["input"] = _json.loads(raw)
-                except Exception:
-                    tu["input"] = {}
+            for tc in tool_calls:
+                func = tc.get("function", {})
+                tool_name = func.get("name", "")
+                tool_input = func.get("arguments", {})
 
-                assistant_content.append({
-                    "type": "tool_use",
-                    "id": tu["id"],
-                    "name": tu["name"],
-                    "input": tu["input"],
-                })
-
-                result_text = await execute_tool(tu["name"], tu["input"], db, user)
+                yield ("tool_call", tool_name)
+                result_text = await execute_tool(tool_name, tool_input, db, user)
                 yield ("tool_result", result_text)
 
-                tool_results_content.append({
-                    "type": "tool_result",
-                    "tool_use_id": tu["id"],
-                    "content": result_text,
-                })
-
-            # Đưa assistant + tool results vào messages, tiếp tục vòng lặp
-            messages.append({"role": "assistant", "content": assistant_content})
-            messages.append({"role": "user", "content": tool_results_content})
+                messages.append({"role": "tool", "content": result_text})
 
         yield (
             "done",
-            f'{{"model":"{model}","input_tokens":{total_input_tokens},"output_tokens":{total_output_tokens}}}',
+            json.dumps({
+                "model": model,
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+            }),
         )
 
-    except anthropic.APIError as e:
+    except Exception as e:
         yield ("error", str(e))

@@ -151,19 +151,11 @@ async def _handle_zalo_message(follower_id: str, message_text: str) -> None:
         model = route_model(message_text)
 
         # AI call (non-streaming cho Zalo)
-        import anthropic
+        from app.services.ai import chat_once
         messages = list(session.context_window or []) + [
             {"role": "user", "content": message_text}
         ]
-
-        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-        response = await client.messages.create(
-            model=model,
-            max_tokens=1024,
-            system=system_prompt,
-            messages=messages,
-        )
-        reply_text = response.content[0].text
+        reply_text = await chat_once(system_prompt, messages, model=model, max_tokens=1024)
 
         # Truncate nếu quá dài cho Zalo (giới hạn 2000 chars)
         if len(reply_text) > 1900:
