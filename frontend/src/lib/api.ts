@@ -70,6 +70,21 @@ export const clients = {
   crawlJobs: (id: string) => request<object[]>(`/widget/clients/${id}/crawl-jobs`),
 }
 
+// Knowledge Base
+export const knowledge = {
+  list: () => request<import('@/types/chat').KnowledgeDoc[]>('/knowledge/docs'),
+  upload: (formData: FormData) =>
+    fetch(`${BASE}/knowledge/upload`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    }).then(async r => {
+      if (!r.ok) { const e = await r.json().catch(() => ({ detail: r.statusText })); throw new Error(e.detail ?? 'Upload thất bại') }
+      return r.json() as Promise<import('@/types/chat').KnowledgeDoc>
+    }),
+  delete: (id: string) => request(`/knowledge/docs/${id}`, { method: 'DELETE' }),
+}
+
 // Raw fetch cho SSE (POST)
 export function fetchSSE(message: string, sessionId?: string): Promise<Response> {
   return fetch(`${BASE}/chat/message`, {

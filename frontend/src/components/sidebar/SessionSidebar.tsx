@@ -28,6 +28,7 @@ export default function SessionSidebar({
 }: Props) {
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading]   = useState(true)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
 
   useEffect(() => {
     chat.sessions().then(setSessions).catch(() => {}).finally(() => setLoading(false))
@@ -35,6 +36,12 @@ export default function SessionSidebar({
 
   const handleSelect = (id: string) => { onSelectSession(id); onClose?.() }
   const handleNew    = () => { onNewChat(); onClose?.() }
+
+  const handleDeleteSession = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    await chat.deleteSession(id)
+    setSessions(prev => prev.filter(s => s.id !== id))
+  }
 
   return (
     <>
@@ -104,10 +111,15 @@ export default function SessionSidebar({
           </button>
 
           {/* Nav links */}
-          <div className="flex gap-1.5 mt-2">
+          <div className="flex gap-1.5 mt-2 flex-wrap">
             <NavLink href="/tasks" label="Tasks" icon={
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+            } />
+            <NavLink href="/reminders" label="Nhắc nhở" icon={
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
             } />
             {user.role === 'admin' && (
@@ -136,25 +148,46 @@ export default function SessionSidebar({
             <ul>
               {sessions.map(s => {
                 const active = s.id === currentSessionId
+                const hovered = hoveredId === s.id
                 return (
                   <li key={s.id}>
-                    <button
-                      onClick={() => handleSelect(s.id)}
-                      className="w-full text-left px-3 py-2.5 rounded-2xl transition-all duration-150 active:scale-[0.98] flex flex-col gap-0.5 mb-0.5"
-                      style={{ background: active ? '#F2F1F6' : 'transparent' }}
-                      onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'rgba(242,241,246,0.7)' }}
-                      onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                    <div
+                      className="relative mb-0.5 rounded-2xl transition-all duration-150"
+                      style={{ background: active ? '#F2F1F6' : hovered ? 'rgba(242,241,246,0.7)' : 'transparent' }}
+                      onMouseEnter={() => setHoveredId(s.id)}
+                      onMouseLeave={() => setHoveredId(null)}
                     >
-                      <span
-                        className="truncate text-[13px] font-medium leading-tight"
-                        style={{ color: active ? '#007AFF' : '#18181B' }}
+                      <button
+                        onClick={() => handleSelect(s.id)}
+                        className="w-full text-left px-3 py-2.5 flex flex-col gap-0.5 active:scale-[0.98] pr-8"
                       >
-                        {s.title ?? 'Cuộc trò chuyện mới'}
-                      </span>
-                      <span className="text-[11px]" style={{ color: 'rgba(60,60,67,0.4)' }}>
-                        {timeAgo(s.updated_at)}
-                      </span>
-                    </button>
+                        <span
+                          className="truncate text-[13px] font-medium leading-tight"
+                          style={{ color: active ? '#007AFF' : '#18181B' }}
+                        >
+                          {s.title ?? 'Cuộc trò chuyện mới'}
+                        </span>
+                        <span className="text-[11px]" style={{ color: 'rgba(60,60,67,0.4)' }}>
+                          {timeAgo(s.updated_at)}
+                        </span>
+                      </button>
+
+                      {/* Delete button — hiện khi hover, ẩn nếu đang active */}
+                      {hovered && !active && (
+                        <button
+                          onClick={e => handleDeleteSession(e, s.id)}
+                          title="Xoá hội thoại"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center"
+                          style={{ color: 'rgba(60,60,67,0.4)', background: 'rgba(30,30,50,0.07)' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#FF3B30')}
+                          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(60,60,67,0.4)')}
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </li>
                 )
               })}

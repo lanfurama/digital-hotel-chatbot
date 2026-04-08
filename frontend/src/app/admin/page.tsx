@@ -1,9 +1,9 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
-import { admin as adminApi, clients as clientsApi } from '@/lib/api'
-import type { User } from '@/types/chat'
+import { admin as adminApi, clients as clientsApi, knowledge as knowledgeApi } from '@/lib/api'
+import type { User, KnowledgeDoc } from '@/types/chat'
 import type { ClientOut } from '@/types/client'
 
 interface Stats { users: number; messages: number; sessions: number; knowledge_docs: number; total_tokens: number }
@@ -18,6 +18,30 @@ function StatCard({ label, value, icon }: { label: string; value: number; icon: 
   )
 }
 
+const ACCESS_LEVEL_BADGE: Record<string, string> = {
+  public: 'bg-green-100 text-green-600',
+  internal: 'bg-blue-100 text-blue-600',
+  confidential: 'bg-red-100 text-red-600',
+}
+
+const ACCESS_LEVEL_LABEL: Record<string, string> = {
+  public: 'Công khai',
+  internal: 'Nội bộ',
+  confidential: 'Bảo mật',
+}
+
+const DOC_STATUS_BADGE: Record<string, string> = {
+  processing: 'bg-yellow-100 text-yellow-600',
+  ready: 'bg-green-100 text-green-600',
+  error: 'bg-red-100 text-red-600',
+}
+
+const DOC_STATUS_LABEL: Record<string, string> = {
+  processing: 'Đang xử lý',
+  ready: 'Sẵn sàng',
+  error: 'Lỗi',
+}
+
 export default function AdminPage() {
   const router = useRouter()
   const { user, loading } = useAuth()
@@ -25,11 +49,19 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([])
   const [auditLogs, setAuditLogs] = useState<any[]>([])
   const [clientList, setClientList] = useState<ClientOut[]>([])
-  const [tab, setTab] = useState<'stats' | 'users' | 'clients' | 'logs'>('stats')
+  const [docList, setDocList] = useState<KnowledgeDoc[]>([])
+  const [tab, setTab] = useState<'stats' | 'users' | 'clients' | 'kb' | 'logs'>('stats')
   const [newClientName, setNewClientName] = useState('')
   const [newClientDomain, setNewClientDomain] = useState('')
   const [crawlUrl, setCrawlUrl] = useState<Record<string, string>>({})
   const [fetching, setFetching] = useState(true)
+
+  // Knowledge Base upload state
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadCategory, setUploadCategory] = useState('general')
+  const [uploadAccessLevel, setUploadAccessLevel] = useState<'public' | 'internal' | 'confidential'>('internal')
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login')
@@ -43,11 +75,13 @@ export default function AdminPage() {
         adminApi.users(),
         adminApi.auditLogs(50),
         clientsApi.list(),
-      ]).then(([s, u, a, c]) => {
+        knowledgeApi.list(),
+      ]).then(([s, u, a, c, docs]) => {
         setStats(s as Stats)
         setUsers(u)
         setAuditLogs(a)
         setClientList(c)
+        setDocList(docs)
       }).finally(() => setFetching(false))
     }
   }, [user])
@@ -55,6 +89,31 @@ export default function AdminPage() {
   const handleRoleChange = async (userId: string, newRole: string) => {
     await adminApi.changeRole(userId, newRole)
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u))
+  }
+
+  const handleUpload = async () => {
+    const file = fileInputRef.current?.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setUploadError('')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('category', uploadCategory)
+      fd.append('access_level', uploadAccessLevel)
+      const doc = await knowledgeApi.upload(fd)
+      setDocList(prev => [doc, ...prev])
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    } catch (e: any) {
+      setUploadError(e.message ?? 'Upload thất bại')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleDeleteDoc = async (id: string) => {
+    await knowledgeApi.delete(id)
+    setDocList(prev => prev.filter(d => d.id !== id))
   }
 
   if (loading || fetching) {
@@ -75,12 +134,18 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="bg-white border-b border-gray-100 px-6">
-        <div className="flex gap-1">
-          {([['stats', 'Tổng quan'], ['users', 'Người dùng'], ['clients', 'Widget Clients'], ['logs', 'Audit Log']] as const).map(([key, label]) => (
+        <div className="flex gap-1 overflow-x-auto">
+          {([
+            ['stats', 'Tổng quan'],
+            ['users', 'Người dùng'],
+            ['clients', 'Widget Clients'],
+            ['kb', 'Knowledge Base'],
+            ['logs', 'Audit Log'],
+          ] as const).map(([key, label]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+              className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 tab === key ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -237,6 +302,105 @@ export default function AdminPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Knowledge Base tab */}
+        {tab === 'kb' && (
+          <div className="space-y-4">
+            {/* Upload form */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <h3 className="font-medium text-gray-800 mb-3">Tải lên tài liệu mới</h3>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.xlsx,.md"
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none file:mr-3 file:py-1 file:px-3 file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-600 file:rounded-md"
+                />
+                <select
+                  value={uploadCategory}
+                  onChange={e => setUploadCategory(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400"
+                >
+                  <option value="general">Tổng hợp</option>
+                  <option value="policy">Chính sách</option>
+                  <option value="room">Phòng & gói</option>
+                  <option value="procedure">Quy trình</option>
+                  <option value="training">Đào tạo</option>
+                </select>
+                <select
+                  value={uploadAccessLevel}
+                  onChange={e => setUploadAccessLevel(e.target.value as 'public' | 'internal' | 'confidential')}
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400"
+                >
+                  <option value="public">Công khai</option>
+                  <option value="internal">Nội bộ</option>
+                  <option value="confidential">Bảo mật</option>
+                </select>
+                <button
+                  onClick={handleUpload}
+                  disabled={uploading}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm rounded-lg whitespace-nowrap flex items-center gap-2"
+                >
+                  {uploading && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                  {uploading ? 'Đang tải...' : 'Tải lên'}
+                </button>
+              </div>
+              {uploadError && <p className="text-sm text-red-500 mt-2">{uploadError}</p>}
+              <p className="text-xs text-gray-400 mt-2">Hỗ trợ: PDF, DOCX, XLSX, MD</p>
+            </div>
+
+            {/* Docs table */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-left">
+                  <tr>
+                    <th className="px-4 py-3 font-medium text-gray-600">Tên tài liệu</th>
+                    <th className="px-4 py-3 font-medium text-gray-600">Danh mục</th>
+                    <th className="px-4 py-3 font-medium text-gray-600">Quyền truy cập</th>
+                    <th className="px-4 py-3 font-medium text-gray-600">Trạng thái</th>
+                    <th className="px-4 py-3 font-medium text-gray-600">Ngày tải</th>
+                    <th className="px-4 py-3 font-medium text-gray-600"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {docList.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-gray-400 text-sm">
+                        Chưa có tài liệu nào. Hãy tải lên tài liệu đầu tiên.
+                      </td>
+                    </tr>
+                  ) : docList.map(doc => (
+                    <tr key={doc.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-gray-800 max-w-xs truncate">{doc.name}</td>
+                      <td className="px-4 py-3 text-gray-500 capitalize">{doc.category}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ACCESS_LEVEL_BADGE[doc.access_level]}`}>
+                          {ACCESS_LEVEL_LABEL[doc.access_level]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DOC_STATUS_BADGE[doc.status]}`}>
+                          {DOC_STATUS_LABEL[doc.status]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
+                        {new Date(doc.created_at).toLocaleDateString('vi-VN')}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleDeleteDoc(doc.id)}
+                          className="text-xs text-red-400 hover:text-red-600"
+                        >
+                          Xoá
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

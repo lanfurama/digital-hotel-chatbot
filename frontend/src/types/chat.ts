@@ -39,6 +39,15 @@ export type SSEEvent =
   | { type: 'done'; session_id: string; message_id: string; latency_ms: number; tokens: number }
   | { type: 'error'; message: string }
 
+export interface KnowledgeDoc {
+  id: string
+  name: string
+  category: string
+  access_level: 'public' | 'internal' | 'confidential'
+  status: 'processing' | 'ready' | 'error'
+  created_at: string
+}
+
 // Local streaming message (in-progress)
 export interface StreamingMessage {
   role: 'assistant'
