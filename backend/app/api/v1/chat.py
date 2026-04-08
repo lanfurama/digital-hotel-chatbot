@@ -13,6 +13,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated, AsyncGenerator
 
+from sqlalchemy.orm.attributes import flag_modified
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
@@ -99,11 +101,13 @@ async def _sse_generator(
     )
 
     # 3. Context window (summarize nếu cần)
+    raw_ctx = list(session.context_window or [])
+    logger.info(f"[CTX] session={session.id} context_window has {len(raw_ctx)} messages")
     try:
-        context_window = await maybe_summarize(list(session.context_window or []))
+        context_window = await maybe_summarize(raw_ctx)
     except Exception as e:
         logger.warning(f"Summarize failed, using raw context: {e}")
-        context_window = list(session.context_window or [])
+        context_window = raw_ctx
 
     # 4. Route model
     model = route_model(user_message)
@@ -167,6 +171,7 @@ async def _sse_generator(
         {"role": "assistant", "content": full_text},
     ]
     session.context_window = new_context
+    flag_modified(session, "context_window")
     session.token_count = (session.token_count or 0) + total_tokens
     session.updated_at = datetime.now(timezone.utc)
 
@@ -195,6 +200,7 @@ async def _sse_generator(
     )
     db.add_all([user_msg, assistant_msg])
     await db.commit()
+    logger.info(f"[CTX] session={session.id} saved context_window with {len(new_context)} messages")
 
     yield f"data: {json.dumps({'type': 'done', 'session_id': str(session.id), 'message_id': str(assistant_msg.id), 'latency_ms': latency_ms, 'tokens': total_tokens})}\n\n"
 

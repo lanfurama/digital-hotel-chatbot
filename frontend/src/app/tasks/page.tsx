@@ -23,6 +23,15 @@ const PRIORITY_LABEL: Record<string, string> = {
   low: 'Thấp', medium: 'Trung bình', high: 'Cao', urgent: 'Khẩn',
 }
 
+/** Pill styles for “move to column” actions — reads as buttons, not raw text. */
+const MOVE_TO_STYLES: Record<TaskStatus, string> = {
+  todo: 'border-slate-200/90 bg-white text-slate-700 hover:bg-slate-50',
+  in_progress: 'border-blue-200/90 bg-white text-blue-700 hover:bg-blue-50/90',
+  review: 'border-amber-200/90 bg-white text-amber-800 hover:bg-amber-50/70',
+  done: 'border-emerald-200/90 bg-white text-emerald-700 hover:bg-emerald-50/90',
+  cancelled: 'border-gray-200/90 bg-white text-gray-600 hover:bg-gray-50',
+}
+
 function TaskCard({ task, onStatusChange }: { task: Task; onStatusChange: (id: string, status: TaskStatus) => void }) {
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done'
 
@@ -45,13 +54,14 @@ function TaskCard({ task, onStatusChange }: { task: Task; onStatusChange: (id: s
         )}
       </div>
 
-      {/* Status mover */}
-      <div className="flex gap-1 flex-wrap pt-1">
+      <div className="flex gap-1.5 flex-wrap pt-1">
         {COLUMNS.filter(c => c.status !== task.status).map(col => (
           <button
             key={col.status}
+            type="button"
+            title={`Chuyển sang: ${col.label}`}
             onClick={() => onStatusChange(task.id, col.status)}
-            className="text-xs text-indigo-600 hover:text-indigo-800 underline underline-offset-2"
+            className={`text-xs font-medium px-2.5 py-1 rounded-xl border shadow-sm transition-all duration-200 ease-in-out hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-gray-400/50 ${MOVE_TO_STYLES[col.status]}`}
           >
             → {col.label}
           </button>

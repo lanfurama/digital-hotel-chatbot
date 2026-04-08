@@ -40,7 +40,7 @@ class Task(Base):
     project_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     assigned_to: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    tags: Mapped[list | None] = mapped_column(ARRAY(String))
+    tags: Mapped[list] = mapped_column(ARRAY(String), default=list, server_default="{}")
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("NOW()")

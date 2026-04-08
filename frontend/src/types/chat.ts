@@ -57,4 +57,6 @@ export interface StreamingMessage {
   activeTools?: string[]
   isStreaming: boolean
   latency_ms?: number
+  /** Thời điểm bắt đầu trả lời (client), hiển thị khi đang stream */
+  created_at?: string
 }

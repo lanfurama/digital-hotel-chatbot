@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from sqlalchemy import select
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
@@ -164,6 +165,7 @@ async def _handle_zalo_message(follower_id: str, message_text: str) -> None:
         # Cập nhật context_window
         new_context = messages + [{"role": "assistant", "content": reply_text}]
         session.context_window = new_context[-20:]
+        flag_modified(session, "context_window")
         session.updated_at = datetime.now(timezone.utc)
 
         # Lưu messages

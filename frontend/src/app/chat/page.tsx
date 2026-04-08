@@ -7,7 +7,10 @@ import { parseSSEStream } from '@/lib/sse'
 import SessionSidebar from '@/components/sidebar/SessionSidebar'
 import MessageBubble from '@/components/chat/MessageBubble'
 import ChatInput from '@/components/chat/ChatInput'
+import { chatTheme } from '@/lib/chat-theme'
 import type { Message, StreamingMessage } from '@/types/chat'
+
+const SUGGESTION_ANIM = ['', 'delay-1', 'delay-2', 'delay-3'] as const
 
 const SUGGESTIONS = [
   'Quy trình check-in là gì?',
@@ -57,7 +60,12 @@ export default function ChatPage() {
       model_used: null, latency_ms: null, created_at: new Date().toISOString(),
     }
     setMessages(prev => [...prev, tempUserMsg])
-    setStreaming({ role: 'assistant', content: '', isStreaming: true })
+    setStreaming({
+      role: 'assistant',
+      content: '',
+      isStreaming: true,
+      created_at: new Date().toISOString(),
+    })
 
     try {
       const response = await fetchSSE(message, sessionId ?? undefined)
@@ -91,10 +99,10 @@ export default function ChatPage() {
   /* Loading */
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F2F2F7' }}>
+      <div className="min-h-screen flex items-center justify-center bg-[#EDE9E4]">
         <div
           className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-          style={{ borderColor: '#007AFF transparent transparent transparent' }}
+          style={{ borderColor: `${chatTheme.accent} transparent transparent transparent` }}
         />
       </div>
     )
@@ -105,7 +113,7 @@ export default function ChatPage() {
   const firstName = user.name.split(' ').pop() ?? user.name
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#EAEAEF' }}>
+    <div className="flex h-screen overflow-hidden bg-[#EDE9E4]">
       {/* Sidebar */}
       <SessionSidebar
         currentSessionId={sessionId}
@@ -120,96 +128,93 @@ export default function ChatPage() {
       {/* Main */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        {/* Navigation bar — frosted glass */}
-        <div
-          className="flex items-center gap-2 px-4 py-3 flex-shrink-0"
+        <header
+          className="flex items-center gap-3 px-4 py-3 flex-shrink-0 border-b border-stone-200/90"
           style={{
-            background: 'rgba(234,234,239,0.88)',
-            backdropFilter: 'saturate(180%) blur(20px)',
-            WebkitBackdropFilter: 'saturate(180%) blur(20px)',
-            borderBottom: '1px solid rgba(30,30,50,0.1)',
+            background: chatTheme.surfaceWarm,
+            backgroundImage: `linear-gradient(180deg, ${chatTheme.surfaceWarm} 0%, rgba(245,243,240,0.85) 100%)`,
+            backdropFilter: 'saturate(160%) blur(16px)',
+            WebkitBackdropFilter: 'saturate(160%) blur(16px)',
           }}
         >
-          {/* Hamburger */}
           <button
-            className="md:hidden w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 active:opacity-50 transition-opacity"
-            style={{ background: 'rgba(30,30,50,0.08)', color: 'rgba(30,30,50,0.6)' }}
+            type="button"
+            className="md:hidden w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-stone-200/60 text-stone-600 active:scale-95 transition-all duration-200"
             onClick={() => setSidebarOpen(true)}
+            aria-label="Mở menu"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h10" />
             </svg>
           </button>
 
-          <h2 className="flex-1 text-[15px] font-semibold text-black tracking-[-0.2px] truncate">
-            {sessionId ? 'Cuộc trò chuyện' : 'Cuộc trò chuyện mới'}
-          </h2>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-[15px] font-semibold text-stone-900 tracking-tight truncate">
+              {sessionId ? 'Cuộc trò chuyện' : 'Cuộc trò chuyện mới'}
+            </h2>
+            <p className="text-[11px] text-stone-500 truncate hidden sm:block">
+              {sessionId ? 'Tiếp tục hội thoại với trợ lý khách sạn' : 'Hỏi quy trình, tài liệu hoặc tạo task'}
+            </p>
+          </div>
 
           {sessionId && (
             <button
+              type="button"
               onClick={handleNewChat}
-              className="flex items-center gap-1.5 text-[13px] font-medium px-3 py-1.5 rounded-xl transition-all active:opacity-50 flex-shrink-0"
-              style={{ background: 'rgba(0,122,255,0.1)', color: '#007AFF' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,122,255,0.16)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,122,255,0.1)')}
+              className="flex items-center gap-1.5 text-[13px] font-medium px-3 py-2 rounded-xl flex-shrink-0 border border-amber-900/10 shadow-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              style={{ backgroundColor: chatTheme.accentSoft, color: chatTheme.accent }}
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
               </svg>
               Mới
             </button>
           )}
-        </div>
+        </header>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-5" style={{ background: '#EAEAEF' }}>
+        <div
+          className="flex-1 overflow-y-auto px-4 py-6 bg-[#EDE9E4]"
+          style={{
+            backgroundImage: 'radial-gradient(ellipse 120% 80% at 50% -20%, rgba(186,117,23,0.06), transparent 55%)',
+          }}
+        >
           <div className="max-w-3xl mx-auto space-y-3">
 
             {/* Empty state */}
             {messages.length === 0 && !streaming && (
-              <div className="flex flex-col items-center text-center py-16 anim-fade-up">
+              <div className="flex flex-col items-center text-center py-14 sm:py-16 anim-fade-up">
                 <div
-                  className="w-16 h-16 rounded-[22px] flex items-center justify-center mb-5"
+                  className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 shadow-sm"
                   style={{
-                    background: 'linear-gradient(145deg, #007AFF 0%, #5E5CE6 100%)',
-                    boxShadow: '0 8px 28px rgba(0,122,255,0.25)',
+                    background: `linear-gradient(145deg, ${chatTheme.accent} 0%, ${chatTheme.accentDark} 100%)`,
+                    boxShadow: `0 10px 28px -4px ${chatTheme.accentGlow}`,
                   }}
                 >
-                  <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="currentColor">
+                  <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                     <path d="M12 3a1 1 0 0 1 1 1v.27A8.002 8.002 0 0 1 20 12h1a1 1 0 1 1 0 2H3a1 1 0 1 1 0-2h1a8.002 8.002 0 0 1 7-7.73V4a1 1 0 0 1 1-1ZM5 16h14v1.5H5V16ZM4 19h16v1.5H4V19Z" />
                   </svg>
                 </div>
 
-                <h3 className="text-[22px] font-semibold text-black tracking-[-0.4px] mb-1.5">
+                <h3 className="text-2xl font-semibold text-stone-900 tracking-tight mb-2">
                   Xin chào, {firstName}!
                 </h3>
-                <p className="text-[15px] max-w-xs leading-relaxed" style={{ color: 'rgba(30,30,50,0.55)' }}>
+                <p className="text-[15px] max-w-sm leading-relaxed text-stone-600 px-2">
                   Hỏi bất cứ điều gì về quy trình, tài liệu hoặc nghiệp vụ khách sạn.
                 </p>
 
-                <div className="flex flex-wrap gap-2 justify-center mt-6 max-w-sm">
+                <div className="flex flex-wrap gap-2 justify-center mt-8 max-w-lg px-2">
                   {SUGGESTIONS.map((q, i) => (
                     <button
                       key={q}
+                      type="button"
                       onClick={() => handleSend(q)}
                       disabled={isSending}
-                      className={`text-[13px] px-3.5 py-2 rounded-2xl transition-all duration-150 disabled:opacity-40 active:scale-95 anim-fade-up delay-${i + 1}`}
-                      style={{
-                        background: '#F0EFF5',
-                        border: '1px solid rgba(30,30,50,0.09)',
-                        color: 'rgba(30,30,50,0.65)',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                      }}
-                      onMouseEnter={e => {
-                        ;(e.currentTarget as HTMLElement).style.background = 'rgba(0,122,255,0.07)'
-                        ;(e.currentTarget as HTMLElement).style.color = '#007AFF'
-                        ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(0,122,255,0.2)'
-                      }}
-                      onMouseLeave={e => {
-                        ;(e.currentTarget as HTMLElement).style.background = '#F0EFF5'
-                        ;(e.currentTarget as HTMLElement).style.color = 'rgba(30,30,50,0.65)'
-                        ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(30,30,50,0.09)'
-                      }}
+                      className={[
+                        'text-[13px] px-3.5 py-2.5 rounded-2xl border border-stone-200/90 bg-white/85 text-stone-700 shadow-sm',
+                        'transition-all duration-200 ease-in-out hover:bg-amber-50/90 hover:border-amber-900/15 hover:text-[#9a6212] hover:shadow',
+                        'disabled:opacity-40 disabled:pointer-events-none active:scale-[0.98] anim-fade-up',
+                        SUGGESTION_ANIM[i] ?? '',
+                      ].join(' ')}
                     >
                       {q}
                     </button>

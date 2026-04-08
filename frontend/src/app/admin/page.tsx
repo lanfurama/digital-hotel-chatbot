@@ -77,7 +77,7 @@ export default function AdminPage() {
         clientsApi.list(),
         knowledgeApi.list(),
       ]).then(([s, u, a, c, docs]) => {
-        setStats(s as Stats)
+        setStats(s as unknown as Stats)
         setUsers(u)
         setAuditLogs(a)
         setClientList(c)

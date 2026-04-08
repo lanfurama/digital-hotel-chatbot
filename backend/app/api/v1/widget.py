@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.database import get_db
 from app.core.deps import require_role
@@ -128,6 +129,7 @@ async def _widget_sse_generator(
         {"role": "assistant", "content": full_text},
     ]
     session.context_window = new_context
+    flag_modified(session, "context_window")
     session.token_count = (session.token_count or 0) + total_tokens
     session.updated_at = datetime.now(timezone.utc)
 

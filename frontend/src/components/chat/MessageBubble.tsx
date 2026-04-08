@@ -1,4 +1,7 @@
 import type { Message, StreamingMessage } from '@/types/chat'
+import { chatTheme } from '@/lib/chat-theme'
+import { formatMessageDateTime } from '@/lib/format-message-time'
+import { formatChatModelLabel } from '@/lib/model-display'
 
 interface Props {
   message: Message | StreamingMessage
@@ -24,15 +27,23 @@ export default function MessageBubble({ message }: Props) {
   const streaming   = isStreaming(message) && message.isStreaming
   const sources     = isStreaming(message) ? message.sources : undefined
   const activeTools = isStreaming(message) ? message.activeTools : undefined
-  const model       = isStreaming(message) ? message.model : (message as Message).model_used
+  const model = isStreaming(message) ? message.model : (message as Message).model_used
+  const modelLabel = formatChatModelLabel(model ?? undefined)
+  const latencyMs = isStreaming(message)
+    ? message.latency_ms
+    : (message as Message).latency_ms
+  const createdAt = isStreaming(message)
+    ? message.created_at
+    : (message as Message).created_at
+  const timeLabel = formatMessageDateTime(createdAt ?? null)
 
   return (
     <div className={`flex gap-2.5 anim-fade-up ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
       {/* AI Avatar */}
       {!isUser && (
         <div
-          className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5 shadow-ios-sm"
-          style={{ background: 'linear-gradient(145deg, #007AFF, #5E5CE6)' }}
+          className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5 shadow-sm ring-2 ring-white"
+          style={{ background: `linear-gradient(145deg, ${chatTheme.accent}, ${chatTheme.accentDark})` }}
         >
           <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 3a1 1 0 0 1 1 1v.27A8.002 8.002 0 0 1 20 12h1a1 1 0 1 1 0 2H3a1 1 0 1 1 0-2h1a8.002 8.002 0 0 1 7-7.73V4a1 1 0 0 1 1-1ZM5 16h14v1.5H5V16ZM4 19h16v1.5H4V19Z" />
@@ -50,9 +61,9 @@ export default function MessageBubble({ message }: Props) {
                 key={i}
                 className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full"
                 style={{
-                  background: 'rgba(0,122,255,0.08)',
-                  border: '1px solid rgba(0,122,255,0.18)',
-                  color: '#007AFF',
+                  background: chatTheme.accentSoft,
+                  border: `1px solid ${chatTheme.accentBorder}`,
+                  color: chatTheme.accent,
                 }}
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,9 +84,9 @@ export default function MessageBubble({ message }: Props) {
                 key={i}
                 className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full"
                 style={{
-                  background: 'rgba(50,173,230,0.08)',
-                  border: '1px solid rgba(50,173,230,0.2)',
-                  color: '#0A84FF',
+                  background: 'rgba(120,113,108,0.08)',
+                  border: '1px solid rgba(120,113,108,0.2)',
+                  color: '#57534E',
                 }}
               >
                 <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -95,16 +106,16 @@ export default function MessageBubble({ message }: Props) {
           style={
             isUser
               ? {
-                  background: 'linear-gradient(145deg, #007AFF 0%, #5E5CE6 100%)',
+                  background: `linear-gradient(145deg, ${chatTheme.accent} 0%, ${chatTheme.accentDark} 100%)`,
                   color: '#fff',
                   borderBottomRightRadius: 4,
-                  boxShadow: '0 2px 12px rgba(0,122,255,0.22)',
+                  boxShadow: `0 4px 14px -2px ${chatTheme.accentGlow}`,
                 }
               : {
-                  background: '#F0EFF5',
-                  color: '#18181B',
+                  background: chatTheme.composer,
+                  color: '#1c1917',
                   borderBottomLeftRadius: 4,
-                  border: '1px solid rgba(30,30,50,0.07)',
+                  border: '1px solid rgba(120,113,108,0.12)',
                   boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
                 }
           }
@@ -117,20 +128,32 @@ export default function MessageBubble({ message }: Props) {
               {streaming && (
                 <span
                   className="inline-block w-[2px] h-[14px] ml-0.5 align-middle rounded-full anim-blink"
-                  style={{ background: isUser ? 'rgba(255,255,255,0.7)' : '#007AFF' }}
+                  style={{ background: isUser ? 'rgba(255,255,255,0.75)' : chatTheme.accent }}
                 />
               )}
             </>
           )}
         </div>
 
-        {/* Meta */}
-        {!isUser && model && !streaming && (
-          <p className="text-[11px] px-1" style={{ color: 'rgba(60,60,67,0.4)' }}>
-            {model.includes('haiku') ? 'Haiku' : 'Sonnet'}
-            {isStreaming(message) && message.latency_ms
-              ? <span style={{ opacity: 0.6 }}> · {message.latency_ms}ms</span>
-              : null}
+        {timeLabel && (
+          <time
+            dateTime={createdAt ?? undefined}
+            className={[
+              'block w-full text-[11px] px-1 text-stone-500 tabular-nums',
+              isUser ? 'text-end' : 'text-start',
+            ].join(' ')}
+            title={createdAt ?? undefined}
+          >
+            {timeLabel}
+          </time>
+        )}
+
+        {!isUser && modelLabel && !streaming && (
+          <p className="text-[11px] px-1 text-stone-500 tabular-nums">
+            {modelLabel}
+            {latencyMs != null ? (
+              <span className="opacity-70"> · {latencyMs}ms</span>
+            ) : null}
           </p>
         )}
       </div>
